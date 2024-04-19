@@ -7,6 +7,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
 
 type (
@@ -28,7 +29,7 @@ type (
 		MessageWriter
 	}
 
-	// ReceiverConfig encapsulates all configuration settings for the LongPoller.
+	// ReceiverConfig encapsulates all configuration settings for the Receiver.
 	ReceiverConfig struct {
 		LogHandler        slog.Handler
 		AWSConfig         *aws.Config
@@ -87,6 +88,11 @@ func (p *Receiver) Rx() {
 				QueueUrl:            &p.queueURL,
 				MaxNumberOfMessages: p.batchSize,
 				VisibilityTimeout:   p.visibilityTimeout,
+				// this is a workaround until aws-sdk-go-v2 fixes issue #2124 https://github.com/aws/aws-sdk-go-v2/issues/2124
+				AttributeNames: 	[]types.QueueAttributeName{
+					types.QueueAttributeName("ApproximateReceiveCount"),
+					types.QueueAttributeName("ApproximateFirstReceiveTimestamp"),
+				},
 			})
 			if err != nil {
 				if !errors.Is(err, context.Canceled) {
@@ -95,7 +101,7 @@ func (p *Receiver) Rx() {
 				continue
 			}
 			for _, msg := range res.Messages {
-				p.log.Info("received message", "message_id", *msg.MessageId, "body", *msg.Body)
+				p.log.Info("received message", "message_id", *msg.MessageId, "body", *msg.Body, "attributes", msg.Attributes)
 			}
 		}
 	}
