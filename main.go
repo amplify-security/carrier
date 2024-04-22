@@ -8,7 +8,9 @@ import (
 
 	"github.com/amplify-security/carrier/receiver/sqs"
 	"github.com/amplify-security/probe/pool"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	awsSQS "github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/lmittmann/tint"
 )
@@ -35,12 +37,14 @@ func main() {
 		log.Error("failed to load AWS config", "error", err)
 		panic(err)
 	}
+	sqsClient := awsSQS.NewFromConfig(awsCfg, func(o *awsSQS.Options) {
+		o.BaseEndpoint = aws.String(envCfg.SQSEndpoint)
+	})
 	ctrl := make(chan os.Signal, 1)
 	signal.Notify(ctrl, os.Interrupt)
 	receiver := sqs.NewReceiver(&sqs.ReceiverConfig{
 		LogHandler:   logHandler,
-		AWSConfig:    &awsCfg,
-		SQSEndpoint:  envCfg.SQSEndpoint,
+		SQSClient:    sqsClient,
 		SQSQueueName: envCfg.SQSQueueName,
 		BatchSize:    10,
 		Ctx:          ctx,

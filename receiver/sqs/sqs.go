@@ -3,9 +3,10 @@ package sqs
 import (
 	"context"
 	"errors"
+	"io"
 	"log/slog"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/amplify-security/carrier/transmitter"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 )
@@ -14,6 +15,7 @@ type (
 	// MessageReader interface defines the read messages API for SQS. This interface
 	// allows for mocking the SQS client in tests.
 	MessageReader interface {
+		GetQueueUrl(context.Context, *sqs.GetQueueUrlInput, ...func(*sqs.Options)) (*sqs.GetQueueUrlOutput, error)
 		ReceiveMessage(context.Context, *sqs.ReceiveMessageInput, ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
 	}
 
@@ -29,14 +31,20 @@ type (
 		MessageWriter
 	}
 
+	// Transmitter interface defines the transmit API for carrier. This interface
+	// allows for mocking the transmitter in tests.
+	Transmitter interface {
+		Tx(io.Reader, transmitter.TransmitAttributes) error
+	}
+
 	// ReceiverConfig encapsulates all configuration settings for the Receiver.
 	ReceiverConfig struct {
 		LogHandler        slog.Handler
-		AWSConfig         *aws.Config
-		SQSEndpoint       string
+		SQSClient         MessageReadWriter
 		SQSQueueName      string
 		VisibilityTimeout int
 		BatchSize         int
+		Transmitter       Transmitter
 		Ctx               context.Context
 	}
 
@@ -47,6 +55,7 @@ type (
 		queueURL          string
 		visibilityTimeout int32
 		batchSize         int32
+		transmitter       Transmitter
 		ctx               context.Context
 	}
 )
@@ -54,10 +63,7 @@ type (
 // NewReceiver initializes and returns a new LongPoller.
 func NewReceiver(c *ReceiverConfig) *Receiver {
 	log := slog.New(c.LogHandler).With("source", "sqs.Receiver")
-	client := sqs.NewFromConfig(*c.AWSConfig, func(o *sqs.Options) {
-		o.BaseEndpoint = aws.String(c.SQSEndpoint)
-	})
-	res, err := client.GetQueueUrl(c.Ctx, &sqs.GetQueueUrlInput{
+	res, err := c.SQSClient.GetQueueUrl(c.Ctx, &sqs.GetQueueUrlInput{
 		QueueName: &c.SQSQueueName,
 	})
 	if err != nil {
@@ -66,10 +72,11 @@ func NewReceiver(c *ReceiverConfig) *Receiver {
 	}
 	return &Receiver{
 		log:               log,
-		client:            client,
+		client:            c.SQSClient,
 		queueURL:          *res.QueueUrl,
 		visibilityTimeout: int32(c.VisibilityTimeout),
 		batchSize:         int32(c.BatchSize),
+		transmitter:       c.Transmitter,
 		ctx:               c.Ctx,
 	}
 }
@@ -89,7 +96,7 @@ func (p *Receiver) Rx() {
 				MaxNumberOfMessages: p.batchSize,
 				VisibilityTimeout:   p.visibilityTimeout,
 				// this is a workaround until aws-sdk-go-v2 fixes issue #2124 https://github.com/aws/aws-sdk-go-v2/issues/2124
-				AttributeNames: 	[]types.QueueAttributeName{
+				AttributeNames: []types.QueueAttributeName{
 					types.QueueAttributeName("ApproximateReceiveCount"),
 					types.QueueAttributeName("ApproximateFirstReceiveTimestamp"),
 				},
