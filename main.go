@@ -7,6 +7,7 @@ import (
 	"os/signal"
 
 	"github.com/amplify-security/carrier/receiver/sqs"
+	"github.com/amplify-security/carrier/transmitter/webhook"
 	"github.com/amplify-security/probe/pool"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -17,9 +18,13 @@ import (
 
 type (
 	Config struct {
-		WebhookEndpoint string `default:"localhost" split_words:"true"`
-		SQSEndpoint     string `envconfig:"SQS_ENDPOINT" required:"true"`
-		SQSQueueName    string `envconfig:"SQS_QUEUE_NAME" required:"true"`
+		WebhookEndpoint              string `default:"localhost" split_words:"true"`
+		WebhookTLSInsecureSkipVerify bool   `envconfig:"WEBHOOK_TLS_INSECURE_SKIP_VERIFY" default:"false"`
+		SQSEndpoint                  string `envconfig:"SQS_ENDPOINT" required:"true"`
+		SQSQueueName                 string `envconfig:"SQS_QUEUE_NAME" required:"true"`
+		SQSBatchSize                 int    `envconfig:"SQS_BATCH_SIZE" default:"1"`
+		SQSReceivers                 int    `envconfig:"SQS_RECEIVERS" default:"1"`
+		SQSReceiverWorkers           int    `envconfig:"SQS_RECEIVER_WORKERS" default:"1"`
 	}
 )
 
@@ -42,22 +47,27 @@ func main() {
 	})
 	ctrl := make(chan os.Signal, 1)
 	signal.Notify(ctrl, os.Interrupt)
-	receiver := sqs.NewReceiver(&sqs.ReceiverConfig{
-		LogHandler:   logHandler,
-		SQSClient:    sqsClient,
-		SQSQueueName: envCfg.SQSQueueName,
-		BatchSize:    10,
-		Ctx:          ctx,
-	})
 	p := pool.NewPool(&pool.PoolConfig{
 		LogHandler: logHandler,
 		Ctx:        ctx,
-		Size:       4,
+		Size:       envCfg.SQSReceivers,
 	})
-	p.Run(receiver.Rx)
-	p.Run(receiver.Rx)
-	p.Run(receiver.Rx)
-	p.Run(receiver.Rx)
+	t := webhook.NewTransmitter(&webhook.TransmitterConfig{
+		Endpoint:              envCfg.WebhookEndpoint,
+		TLSInsecureSkipVerify: envCfg.WebhookTLSInsecureSkipVerify,
+	})
+	for range envCfg.SQSReceivers {
+		receiver := sqs.NewReceiver(&sqs.ReceiverConfig{
+			LogHandler:   logHandler,
+			SQSClient:    sqsClient,
+			SQSQueueName: envCfg.SQSQueueName,
+			BatchSize:    envCfg.SQSBatchSize,
+			MaxWorkers:   envCfg.SQSReceiverWorkers,
+			Transmitter:  t,
+			Ctx:          ctx,
+		})
+		p.Run(receiver.Rx)
+	}
 	// wait for shutdown
 	<-ctrl
 	cancel()

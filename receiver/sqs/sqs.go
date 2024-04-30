@@ -64,6 +64,7 @@ type (
 		SQSQueueName      string
 		VisibilityTimeout int
 		BatchSize         int
+		MaxWorkers        int
 		Transmitter       Transmitter
 		Ctx               context.Context
 	}
@@ -174,15 +175,19 @@ func NewReceiver(c *ReceiverConfig) *Receiver {
 		log.Error("failed to get queue URL", "queue_name", c.SQSQueueName, "error", err)
 		panic(err)
 	}
+	workers := c.BatchSize
+	if c.MaxWorkers != 0 {
+		workers = c.MaxWorkers
+	}
 	messages := make(chan *message, c.BatchSize)
 	results := make(chan *transmitResult, c.BatchSize)
 	ctx, cancel := context.WithCancel(context.Background())
 	p := pool.NewPool(&pool.PoolConfig{
-		Size:       c.BatchSize,
-		BufferSize: c.BatchSize,
+		Size:       workers,
+		BufferSize: workers,
 		Ctx:        ctx,
 	})
-	for range c.BatchSize {
+	for range workers {
 		// start message handlers
 		h := newHandler(&handlerConfig{
 			Transmitter: c.Transmitter,
