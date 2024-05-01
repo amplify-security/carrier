@@ -76,6 +76,7 @@ type (
 		queueURL          string
 		visibilityTimeout int32
 		batchSize         int32
+		maxWorkers        int
 		transmitter       Transmitter
 		ctx               context.Context
 		cancel            context.CancelFunc
@@ -158,8 +159,9 @@ func (h *handler) handleMessages() {
 			return
 		case m := <-h.work:
 			h.results <- &transmitResult{
-				MessageID: m.MessageID,
-				err:       h.handleMessage(m),
+				MessageID:     m.MessageID,
+				ReceiptHandle: m.ReceiptHandle,
+				err:           h.handleMessage(m),
 			}
 		}
 	}
@@ -203,10 +205,13 @@ func NewReceiver(c *ReceiverConfig) *Receiver {
 		queueURL:          *res.QueueUrl,
 		visibilityTimeout: int32(c.VisibilityTimeout),
 		batchSize:         int32(c.BatchSize),
+		maxWorkers:        workers,
 		transmitter:       c.Transmitter,
 		ctx:               c.Ctx,
 		cancel:            cancel,
 		pool:              p,
+		messages:          messages,
+		results:           results,
 	}
 }
 
@@ -256,6 +261,8 @@ func (p *Receiver) processMessages(res *sqs.ReceiveMessageOutput) {
 		})
 		if err != nil {
 			p.log.Error("failed to delete messages", "error", err)
+		} else {
+			p.log.Debug("deleted messages", "count", len(deleteEntries))
 		}
 	}
 	if len(retryEntries) > 0 {
@@ -266,13 +273,15 @@ func (p *Receiver) processMessages(res *sqs.ReceiveMessageOutput) {
 		})
 		if err != nil {
 			p.log.Error("failed to update message visibility", "error", err)
+		} else {
+			p.log.Debug("updated message visibility", "count", len(retryEntries))
 		}
 	}
 }
 
 // Rx starts the Receiver event loop to receive messages.
 func (p *Receiver) Rx() {
-	p.log.Info("starting event loop")
+	p.log.Info("starting event loop", "batch_size", p.batchSize, "max_workers", p.maxWorkers)
 	for {
 		select {
 		case <-p.ctx.Done():
@@ -299,6 +308,7 @@ func (p *Receiver) Rx() {
 				}
 				continue
 			}
+			p.log.Debug("received messages", "count", len(res.Messages))
 			p.processMessages(res)
 			// continue
 		}
