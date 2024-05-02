@@ -18,7 +18,7 @@ import (
 
 type (
 	Config struct {
-		WebhookEndpoint              string `default:"localhost" split_words:"true"`
+		WebhookEndpoint              string `default:"http://localhost:9000" split_words:"true"`
 		WebhookTLSInsecureSkipVerify bool   `envconfig:"WEBHOOK_TLS_INSECURE_SKIP_VERIFY" default:"false"`
 		SQSEndpoint                  string `envconfig:"SQS_ENDPOINT" required:"true"`
 		SQSQueueName                 string `envconfig:"SQS_QUEUE_NAME" required:"true"`
