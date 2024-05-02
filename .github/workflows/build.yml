@@ -37,6 +37,7 @@ jobs:
           git-branch: badges
   build:
     name: Build
+    needs: test
     runs-on: ubuntu-latest
     steps:
         - name: Checkout
@@ -49,7 +50,7 @@ jobs:
               amplifysecurity/carrier
             tags: |
               type=sha
-              type=semver
+              type=semver,pattern={{version}}
         - name: Setup QEMU
           uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3.0.0
         - name: Setup Docker Buildx
