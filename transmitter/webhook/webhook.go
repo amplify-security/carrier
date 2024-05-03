@@ -14,7 +14,7 @@ import (
 
 const (
 	// HeaderPrefix is the prefix used for all HTTP request headers sent by the Transmitter.
-	HeaderPrefix = "X-Carrier-"
+	HeaderPrefix     = "X-Carrier-"
 	HeaderRetryAfter = "Retry-After"
 )
 
@@ -53,6 +53,7 @@ func NewTransmitter(c *TransmitterConfig) *Transmitter {
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{
 					InsecureSkipVerify: c.TLSInsecureSkipVerify,
+					MinVersion:         tls.VersionTLS13,
 				},
 			},
 		},
