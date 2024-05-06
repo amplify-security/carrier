@@ -15,14 +15,18 @@ import (
 )
 
 const (
-	// ApproxomiteReceiveCountSQSAttribute SQSAttributes key for the approximate number of times the message has been received.
-	ApproxomiteReceiveCountSQSAttribute = "ApproximateReceiveCount"
-	// ApproxomiteFirstReceiveTimestampSQSAttribute SQSAttributes key for the time the message was first received.
-	ApproxomiteFirstReceiveTimestampSQSAttribute = "ApproximateFirstReceiveTimestamp"
+	// SQSAttributeApproxomiteReceiveCount SQSAttributes key for the approximate number of times the message has been received.
+	SQSAttributeApproxomiteReceiveCount = "ApproximateReceiveCount"
+	// SQSAttributeApproxomiteFirstReceiveTimestamp SQSAttributes key for the time the message was first received.
+	SQSAttributeApproxomiteFirstReceiveTimestamp = "ApproximateFirstReceiveTimestamp"
+	// SQSMessageAttributeBodyContentType SQSMessageAttributes key for the content type of the message body.
+	SQSMessageAttributeBodyContentType = "Body.ContentType"
 	// RecieveCountTransmitAttribute TransmitAttributes key for number of times the message has been received.
-	ReceiveCountTransmitAttribute = "Receive-Count"
-	// FirstReceiveTimeTransmitAttribute TransmitAttributes key for the time the message was first received.
-	FirstReceiveTimeTransmitAttribute = "First-Receive-Time"
+	TransmitAttributeReceiveCount = "Receive-Count"
+	// TransmitAttributeFirstReceiveTime TransmitAttributes key for the time the message was first received.
+	TransmitAttributeFirstReceiveTime = "First-Receive-Time"
+	// TransmitAttributeContentType TransmitAttributes key for the content type of the message body.
+	TransmitAttributeContentType = "Content-Type"
 )
 
 var (
@@ -87,10 +91,11 @@ type (
 
 	// message encapsulates the SQS message and attributes.
 	message struct {
-		MessageID     *string
-		ReceiptHandle *string
-		Body          *string
-		Attributes    map[string]string
+		MessageID         *string
+		ReceiptHandle     *string
+		Body              *string
+		Attributes        map[string]string
+		MessageAttributes map[string]types.MessageAttributeValue
 	}
 
 	// transmitResult encapsulates the result of a transmit operation.
@@ -132,10 +137,18 @@ func (h *handler) generateAttributes(m *message) transmitter.TransmitAttributes 
 	attributes := make(transmitter.TransmitAttributes)
 	for k, v := range m.Attributes {
 		switch k {
-		case ApproxomiteReceiveCountSQSAttribute:
-			attributes[ReceiveCountTransmitAttribute] = v
-		case ApproxomiteFirstReceiveTimestampSQSAttribute:
-			attributes[FirstReceiveTimeTransmitAttribute] = v
+		case SQSAttributeApproxomiteReceiveCount:
+			attributes[TransmitAttributeReceiveCount] = v
+		case SQSAttributeApproxomiteFirstReceiveTimestamp:
+			attributes[TransmitAttributeFirstReceiveTime] = v
+		}
+	}
+	for k, v := range m.MessageAttributes {
+		switch k {
+		case SQSMessageAttributeBodyContentType:
+			if v.StringValue != nil {
+				attributes[TransmitAttributeContentType] = *v.StringValue
+			}
 		}
 	}
 	return attributes
@@ -223,10 +236,11 @@ func (p *Receiver) processMessages(res *sqs.ReceiveMessageOutput) {
 	}
 	for _, msg := range res.Messages {
 		p.messages <- &message{
-			MessageID:     msg.MessageId,
-			ReceiptHandle: msg.ReceiptHandle,
-			Body:          msg.Body,
-			Attributes:    msg.Attributes,
+			MessageID:         msg.MessageId,
+			ReceiptHandle:     msg.ReceiptHandle,
+			Body:              msg.Body,
+			Attributes:        msg.Attributes,
+			MessageAttributes: msg.MessageAttributes,
 		}
 	}
 	deleteEntries := []types.DeleteMessageBatchRequestEntry{}
@@ -298,8 +312,11 @@ func (p *Receiver) Rx() {
 				WaitTimeSeconds:     20,
 				// this is a workaround until aws-sdk-go-v2 fixes issue #2124 https://github.com/aws/aws-sdk-go-v2/issues/2124
 				AttributeNames: []types.QueueAttributeName{
-					types.QueueAttributeName(ApproxomiteReceiveCountSQSAttribute),
-					types.QueueAttributeName(ApproxomiteFirstReceiveTimestampSQSAttribute),
+					types.QueueAttributeName(SQSAttributeApproxomiteReceiveCount),
+					types.QueueAttributeName(SQSAttributeApproxomiteFirstReceiveTimestamp),
+				},
+				MessageAttributeNames: []string{
+					SQSMessageAttributeBodyContentType,
 				},
 			})
 			if err != nil {

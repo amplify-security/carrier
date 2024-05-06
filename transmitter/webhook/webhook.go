@@ -14,8 +14,11 @@ import (
 
 const (
 	// HeaderPrefix is the prefix used for all HTTP request headers sent by the Transmitter.
-	HeaderPrefix     = "X-Carrier-"
+	HeaderPrefix = "X-Carrier-"
+	// HeaderRetryAfter is the standard Retry-After header.
 	HeaderRetryAfter = "Retry-After"
+	// HeaderContentType is the standard Content-Type header.
+	HeaderContentType = "Content-Type"
 )
 
 var (
@@ -36,12 +39,14 @@ type (
 	TransmitterConfig struct {
 		Endpoint              string
 		TLSInsecureSkipVerify bool
+		DefaultContentType    string
 	}
 
 	// Transmitter sends messages to a webhook endpoint.
 	Transmitter struct {
-		endpoint string
-		client   HTTPRequestDoer
+		endpoint           string
+		client             HTTPRequestDoer
+		defaultContentType string
 	}
 )
 
@@ -57,6 +62,7 @@ func NewTransmitter(c *TransmitterConfig) *Transmitter {
 				},
 			},
 		},
+		defaultContentType: c.DefaultContentType,
 	}
 }
 
@@ -67,7 +73,16 @@ func (t *Transmitter) newRequest(message io.Reader, attributes transmitter.Trans
 		return req, err
 	}
 	for k, v := range attributes {
-		req.Header.Add(fmt.Sprintf("%s%s", HeaderPrefix, k), v)
+		if k == HeaderContentType {
+			// send Content-Type header unmodified
+			req.Header.Add(k, v)
+		} else {
+			req.Header.Add(fmt.Sprintf("%s%s", HeaderPrefix, k), v)
+		}
+	}
+	if req.Header.Get(HeaderContentType) == "" && t.defaultContentType != "" {
+		// add the default Content-Type header
+		req.Header.Add(HeaderContentType, t.defaultContentType)
 	}
 	return req, err
 }

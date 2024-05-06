@@ -20,6 +20,7 @@ type (
 	Config struct {
 		WebhookEndpoint              string `default:"http://localhost:9000" split_words:"true"`
 		WebhookTLSInsecureSkipVerify bool   `envconfig:"WEBHOOK_TLS_INSECURE_SKIP_VERIFY" default:"false"`
+		WebhookDefaultContentType    string `default:"application/json" split_words:"true"`
 		SQSEndpoint                  string `envconfig:"SQS_ENDPOINT" required:"true"`
 		SQSQueueName                 string `envconfig:"SQS_QUEUE_NAME" required:"true"`
 		SQSBatchSize                 int    `envconfig:"SQS_BATCH_SIZE" default:"1"`
@@ -55,6 +56,7 @@ func main() {
 	t := webhook.NewTransmitter(&webhook.TransmitterConfig{
 		Endpoint:              envCfg.WebhookEndpoint,
 		TLSInsecureSkipVerify: envCfg.WebhookTLSInsecureSkipVerify,
+		DefaultContentType:    envCfg.WebhookDefaultContentType,
 	})
 	for range envCfg.SQSReceivers {
 		receiver := sqs.NewReceiver(&sqs.ReceiverConfig{

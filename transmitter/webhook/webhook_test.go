@@ -71,11 +71,13 @@ func TestNewTransmitter(t *testing.T) {
 
 func TestTransmitter_newRequest(t *testing.T) {
 	cases := []struct {
-		endpoint   string
-		skipVerify bool
-		r          io.Reader
-		attributes transmitter.TransmitAttributes
-		err        bool
+		endpoint            string
+		skipVerify          bool
+		contentType         string
+		expectedContentType string
+		r                   io.Reader
+		attributes          transmitter.TransmitAttributes
+		err                 bool
 	}{
 		{
 			endpoint: "fake:// \nlocalhost:8080\t",
@@ -86,10 +88,21 @@ func TestTransmitter_newRequest(t *testing.T) {
 			r:        &MockReadCloser{},
 		},
 		{
-			endpoint: "http://localhost:8080",
+			endpoint:            "http://localhost:8080",
+			contentType:         "application/x-yaml",
+			expectedContentType: "application/x-yaml",
 			attributes: transmitter.TransmitAttributes{
-				"Foo":    "bar",
-				"Secure": "yes",
+				"Foo": "bar",
+			},
+		},
+		{
+			endpoint:            "http://localhost:8080",
+			contentType:         "application/x-yaml",
+			expectedContentType: "application/json",
+			attributes: transmitter.TransmitAttributes{
+				"Foo":          "bar",
+				"Secure":       "yes",
+				"Content-Type": "application/json",
 			},
 		},
 	}
@@ -97,6 +110,7 @@ func TestTransmitter_newRequest(t *testing.T) {
 		tx := NewTransmitter(&TransmitterConfig{
 			Endpoint:              c.endpoint,
 			TLSInsecureSkipVerify: c.skipVerify,
+			DefaultContentType:    c.contentType,
 		})
 		req, err := tx.newRequest(c.r, c.attributes)
 		if c.err {
@@ -109,9 +123,18 @@ func TestTransmitter_newRequest(t *testing.T) {
 		}
 		if c.attributes != nil {
 			for k, v := range c.attributes {
-				assert.Contains(t, req.Header, fmt.Sprintf("%s%s", HeaderPrefix, k), fmt.Sprintf("Transmitter.newRequest -> header[%s]", k))
-				assert.Equal(t, v, req.Header.Get(fmt.Sprintf("%s%s", HeaderPrefix, k)), fmt.Sprintf("Transmitter.newRequest -> header[%s] == %s", k, v))
+				if k == HeaderContentType {
+					assert.Contains(t, req.Header, k, fmt.Sprintf("Transmitter.newRequest -> header[%s]", k))
+					assert.Equal(t, v, req.Header.Get(k), fmt.Sprintf("Transmitter.newRequest -> header[%s] == %s", k, v))
+				} else {
+					assert.Contains(t, req.Header, fmt.Sprintf("%s%s", HeaderPrefix, k), fmt.Sprintf("Transmitter.newRequest -> header[%s]", k))
+					assert.Equal(t, v, req.Header.Get(fmt.Sprintf("%s%s", HeaderPrefix, k)), fmt.Sprintf("Transmitter.newRequest -> header[%s] == %s", k, v))
+				}
 			}
+		}
+		if c.expectedContentType != "" {
+			assert.Contains(t, req.Header, HeaderContentType, fmt.Sprintf("Transmitter.newRequest -> header[%s]", HeaderContentType))
+			assert.Equal(t, c.expectedContentType, req.Header.Get(HeaderContentType), fmt.Sprintf("Transmitter.newRequest -> header[%s] == %s", HeaderContentType, c.expectedContentType))
 		}
 	}
 }
