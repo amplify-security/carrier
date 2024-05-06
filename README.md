@@ -99,6 +99,15 @@ If the worker wants to set the visibility timeout of any message, return HTTP st
 timeout to ensure that the message will not be received again until after the `Retry-After` header
 timestamp.
 
+## Webhook `Content-Type` Header
+
+Carrier supports dynamic or pre-configured `Content-Type` header values and will always send the
+`Content-Type` header in the HTTP POST to the webhook. To utilize a dynamic content type with SQS,
+send an [SQS message attribute](https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-metadata.html)
+of Type `String` with Name `Body.ContentType` with the SQS message. The Value of the SQS message
+attribute will be sent to the webhook in the `Content-Type` header. For a configurable but non-dynamic
+`Content-Type` header, use the `CARRIER_WEBHOOK_DEFAULT_CONTENT_TYPE` environment variable.
+
 ## Configuration
 
 Carrier currently has limited configuration options. More configuration options will be added as 
@@ -108,6 +117,7 @@ the project continues to mature. Currently, all configuration is done via enviro
 | -------------------- | -------- | ------- | ----------- |
 | `CARRIER_WEBHOOK_ENDPOINT` | | `http://localhost:9000` | The full path, including protocol, that webhooks will be sent to. For example, if your worker expects webhooks at `/v1/events`, `http://worker:8080/v1/events`. |
 | `CARRIER_WEBHOOK_TLS_INSECURE_SKIP_VERIFY` | | `false` | When set to true, the webhook transmitter will not attempt to validate TLS for an `https` webhook endpoint. |
+| `CARRIER_WEBHOOK_DEFAULT_CONTENT_TYPE` | | `application/json` | The default value that will be sent in the `Content-Type` header in all HTTP POSTS to the webhook endpoint. |
 | `CARRIER_SQS_ENDPOINT` | :white_check_mark: | | The endpoint for the SQS service. Official AWS service endpoints can be found [here](https://docs.aws.amazon.com/general/latest/gr/sqs-service.html). |
 | `CARRIER_SQS_QUEUE_NAME` | :white_check_mark: | | The SQS queue name. |
 | `CARRIER_SQS_BATCH_SIZE` | | `1` | The batch size each SQS receiver will request from SQS. All webhooks are transmitted one message per HTTP request. |

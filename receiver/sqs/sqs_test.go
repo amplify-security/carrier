@@ -11,6 +11,7 @@ import (
 	"github.com/amplify-security/carrier/transmitter"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -123,14 +124,30 @@ func TestHandler_generateAttributes(t *testing.T) {
 		{
 			m: &message{
 				Attributes: map[string]string{
-					ApproxomiteReceiveCountSQSAttribute:          "1",
-					ApproxomiteFirstReceiveTimestampSQSAttribute: "2021-09-01T00:00:00Z",
+					SQSAttributeApproxomiteReceiveCount:          "1",
+					SQSAttributeApproxomiteFirstReceiveTimestamp: "2021-09-01T00:00:00Z",
+				},
+				MessageAttributes: map[string]types.MessageAttributeValue{
+					SQSMessageAttributeBodyContentType: {
+						StringValue: aws.String("application/json"),
+					},
 				},
 			},
 			expected: transmitter.TransmitAttributes{
-				ReceiveCountTransmitAttribute:     "1",
-				FirstReceiveTimeTransmitAttribute: "2021-09-01T00:00:00Z",
+				TransmitAttributeReceiveCount:     "1",
+				TransmitAttributeFirstReceiveTime: "2021-09-01T00:00:00Z",
+				TransmitAttributeContentType:      "application/json",
 			},
+		},
+		{
+			m: &message{
+				MessageAttributes: map[string]types.MessageAttributeValue{
+					SQSMessageAttributeBodyContentType: {
+						BinaryValue: []byte("unsupported"),
+					},
+				},
+			},
+			expected: transmitter.TransmitAttributes{},
 		},
 		{
 			m: &message{
