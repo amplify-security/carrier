@@ -29,7 +29,7 @@ jobs:
         uses: vladopajic/go-test-coverage@97ecc524075d8ece0e1a406edec1c191e2dd3277
         with:
           profile: cover.out
-          local-prefix: github.com/amplify-security/probe
+          local-prefix: github.com/amplify-security/carrier
           threshold-file: 0
           threshold-package: 0
           threshold-total: 0
