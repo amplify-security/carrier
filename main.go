@@ -91,10 +91,14 @@ func main() {
 	ticker := time.NewTicker(1 * time.Minute)
 	ctrl := make(chan os.Signal, 1)
 	signal.Notify(ctrl, os.Interrupt)
+	size := envCfg.SQSReceivers
+	if envCfg.EnableStatLog {
+		size++
+	}
 	p := pool.NewPool(&pool.PoolConfig{
 		LogHandler: logHandler,
 		Ctx:        ctx,
-		Size:       envCfg.SQSReceivers,
+		Size:       size,
 	})
 	t := webhook.NewTransmitter(&webhook.TransmitterConfig{
 		Endpoint:              envCfg.WebhookEndpoint,
