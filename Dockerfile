@@ -2,7 +2,7 @@ FROM golang:1.23.4-alpine AS builder
 
 # Add carrier user
 RUN adduser --uid 1000 --shell /bin/false -h /home/carrier -D carrier && \
-    cat /etc/passwd | grep carrier > /etc/passwd_carrier
+    grep carrier /etc/passwd > /etc/passwd_carrier
 
 WORKDIR /usr/src/app
 

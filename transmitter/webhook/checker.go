@@ -3,6 +3,7 @@ package webhook
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -88,7 +89,7 @@ func (c *HealthChecker) checkEndpoint() (EndpointState, error) {
 	if resp.StatusCode == http.StatusOK {
 		return EndpointStateOnline, nil
 	}
-	return EndpointStateOffline, nil
+	return EndpointStateOffline, fmt.Errorf("%w: %d", ErrNon200StatusCode, resp.StatusCode)
 }
 
 // Run starts the execution loop for HealthChecker.
