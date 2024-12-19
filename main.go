@@ -25,12 +25,17 @@ type (
 		WebhookTLSInsecureSkipVerify bool          `envconfig:"WEBHOOK_TLS_INSECURE_SKIP_VERIFY" default:"false"`
 		WebhookDefaultContentType    string        `default:"application/json" split_words:"true"`
 		WebhookRequestTimeout        time.Duration `default:"60s" split_words:"true"`
+		WebhookHealthCheckEndpoint   string        `split_words:"true"`
+		WebhookOfflineThresholdCount int           `default:"5" split_words:"true"`
+		WebhookHealthCheckInterval   time.Duration `default:"60s" split_words:"true"`
+		WebhookHealthCheckTimeout    time.Duration `default:"10s" split_words:"true"`
 		SQSEndpoint                  string        `envconfig:"SQS_ENDPOINT" required:"true"`
 		SQSQueueName                 string        `envconfig:"SQS_QUEUE_NAME" required:"true"`
 		SQSBatchSize                 int           `envconfig:"SQS_BATCH_SIZE" default:"1"`
 		SQSReceivers                 int           `envconfig:"SQS_RECEIVERS" default:"1"`
 		SQSReceiverWorkers           int           `envconfig:"SQS_RECEIVER_WORKERS" default:"1"`
 		EnableStatLog                bool          `default:"false" split_words:"true"`
+		StatLogTimer                 time.Duration `default:"120s" split_words:"true"`
 	}
 
 	// StatLogger is a utility for logging runtime statistics.
@@ -88,11 +93,15 @@ func main() {
 	sqsClient := awsSQS.NewFromConfig(awsCfg, func(o *awsSQS.Options) {
 		o.BaseEndpoint = aws.String(envCfg.SQSEndpoint)
 	})
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(envCfg.StatLogTimer)
 	ctrl := make(chan os.Signal, 1)
+	state := make(chan webhook.EndpointState, 1)
 	signal.Notify(ctrl, os.Interrupt)
 	size := envCfg.SQSReceivers
 	if envCfg.EnableStatLog {
+		size++
+	}
+	if envCfg.WebhookHealthCheckEndpoint != "" {
 		size++
 	}
 	p := pool.NewPool(&pool.PoolConfig{
@@ -100,6 +109,23 @@ func main() {
 		Ctx:        ctx,
 		Size:       size,
 	})
+	if envCfg.WebhookHealthCheckEndpoint != "" {
+		// start health checker
+		checker := webhook.NewHealthChecker(&webhook.HealthCheckerConfig{
+			LogHandler:            logHandler,
+			WebhookEndpoint:       envCfg.WebhookEndpoint,
+			HealthCheckEndpoint:   envCfg.WebhookHealthCheckEndpoint,
+			Interval:              envCfg.WebhookHealthCheckInterval,
+			Timeout:               envCfg.WebhookHealthCheckTimeout,
+			OfflineThresholdCount: envCfg.WebhookOfflineThresholdCount,
+			TLSInsecureSkipVerify: envCfg.WebhookTLSInsecureSkipVerify,
+			Ctrl:                  state,
+			Ctx:                   ctx,
+		})
+		p.Run(checker.Run)
+		<-state
+		log.Info("carrier has arrived")
+	}
 	t := webhook.NewTransmitter(&webhook.TransmitterConfig{
 		Endpoint:              envCfg.WebhookEndpoint,
 		TLSInsecureSkipVerify: envCfg.WebhookTLSInsecureSkipVerify,
@@ -119,6 +145,7 @@ func main() {
 		p.Run(receiver.Rx)
 	}
 	if envCfg.EnableStatLog {
+		// start stat log
 		statLogger := NewStatLogger(&StatLoggerConfig{
 			Ticker:     ticker,
 			LogHandler: logHandler,
@@ -126,8 +153,11 @@ func main() {
 		})
 		p.Run(statLogger.Run)
 	}
-	// wait for shutdown
-	<-ctrl
+	// wait for shutdown or webhook to go offline
+	select {
+	case <-ctrl:
+	case <-state:
+	}
 	ticker.Stop()
 	cancel()
 	p.Stop(true)
