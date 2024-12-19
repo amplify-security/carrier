@@ -69,6 +69,10 @@ spec:
       containers:
         - name: carrier
           image: amplifysecurity/carrier
+          securityContext:
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
           env:
             - name: CARRIER_WEBHOOK_ENDPOINT
               value: http://localhost:9000/webhook
@@ -81,6 +85,15 @@ spec:
 ```
 
 > **Note**: This example assumes that the Kubernetes service account `carrier-demo` is mapped to an IAM role that has the appropriate permissions to access the `carrier-demo` SQS queue.
+
+## Webhook Health Checks
+
+Carrier supports health checks for the webhook. If a `CARRIER_WEBHOOK_HEALTH_CHECK_ENDPOINT` variable is provided,
+Carrier will wait for this endpoint to come online before attempting to receive messages from SQS and transmit them
+to the webhook endpoint. This can prevent scenarios where Carrier fails to submit many messages before the webhook
+service successfully starts, which can send messages to dead letter queues unnecessarily. In addition, if the webhook
+is determined to go offline, Carrier will exit. This is helpful when carrier is running in a pod, as K8s can restart
+the failed pod. For information on configuring the webhook health check, see the Configuration section below.
 
 ## Dynamic visibility Timeouts
 
@@ -118,6 +131,11 @@ the project continues to mature. Currently, all configuration is done via enviro
 | `CARRIER_WEBHOOK_ENDPOINT` | | `http://localhost:9000` | The full path, including protocol, that webhooks will be sent to. For example, if your worker expects webhooks at `/v1/events`, `http://worker:8080/v1/events`. |
 | `CARRIER_WEBHOOK_TLS_INSECURE_SKIP_VERIFY` | | `false` | When set to true, the webhook transmitter will not attempt to validate TLS for an `https` webhook endpoint. |
 | `CARRIER_WEBHOOK_DEFAULT_CONTENT_TYPE` | | `application/json` | The default value that will be sent in the `Content-Type` header in all HTTP POSTS to the webhook endpoint. |
+| `CARRIER_WEBHOOK_REQUEST_TIMEOUT` | | `60s` | The webhook transmitter request timeout. See Go's [`time.ParseDuration()`](https://pkg.go.dev/time#ParseDuration) for acceptable formats. |
+| `CARRIER_WEBHOOK_HEALTH_CHECK_ENDPOINT` | | | When set, enables health check functionality using the provided endpoint. |
+| `CARRIER_WEBHOOK_OFFLINE_THRESHOLD_COUNT` | | `5` | The number of failed health checks before the webhook is determined to be offline. |
+| `CARRIER_WEBHOOK_HEALTH_CHECK_INTERVAL` | | `60s` | The time interval between webhook health checks. See Go's [`time.ParseDuration()`](https://pkg.go.dev/time#ParseDuration) for acceptable formats. |
+| `CARRIER_WEBHOOK_HEALTH_CHECK_TIMEOUT` | | `10s` | The webhook health check timeout. See Go's [`time.ParseDuration()`](https://pkg.go.dev/time#ParseDuration) for acceptable formats. |
 | `CARRIER_SQS_ENDPOINT` | :white_check_mark: | | The endpoint for the SQS service. Official AWS service endpoints can be found [here](https://docs.aws.amazon.com/general/latest/gr/sqs-service.html). |
 | `CARRIER_SQS_QUEUE_NAME` | :white_check_mark: | | The SQS queue name. |
 | `CARRIER_SQS_BATCH_SIZE` | | `1` | The batch size each SQS receiver will request from SQS. All webhooks are transmitted one message per HTTP request. |
