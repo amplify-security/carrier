@@ -40,6 +40,7 @@ type (
 		Endpoint              string
 		TLSInsecureSkipVerify bool
 		DefaultContentType    string
+		RequestTimeout        time.Duration
 	}
 
 	// Transmitter sends messages to a webhook endpoint.
@@ -52,10 +53,16 @@ type (
 
 // NewTransmitter initializes and returns a new Transmitter.
 func NewTransmitter(c *TransmitterConfig) *Transmitter {
+	var idleConnTimeout time.Duration
+	if c.RequestTimeout > 0 {
+		idleConnTimeout = c.RequestTimeout + (30 * time.Second)
+	}
 	return &Transmitter{
 		endpoint: c.Endpoint,
 		client: &http.Client{
+			Timeout: c.RequestTimeout,
 			Transport: &http.Transport{
+				IdleConnTimeout: idleConnTimeout,
 				TLSClientConfig: &tls.Config{
 					InsecureSkipVerify: c.TLSInsecureSkipVerify,
 					MinVersion:         tls.VersionTLS13,

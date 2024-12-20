@@ -1,12 +1,13 @@
 module github.com/amplify-security/carrier
 
-go 1.22.0
+go 1.23.4
 
 require (
 	github.com/amplify-security/probe v0.1.0
 	github.com/aws/aws-sdk-go-v2 v1.26.1
 	github.com/aws/aws-sdk-go-v2/config v1.27.11
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.31.4
+	github.com/dustin/go-humanize v1.0.1
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lmittmann/tint v1.0.4
 	github.com/stretchr/testify v1.7.1
