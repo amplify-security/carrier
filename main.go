@@ -21,6 +21,14 @@ import (
 
 type (
 	Config struct {
+		EnableColorizedLogging       bool          `default:"false" split_words:"true"`
+		EnableStatLog                bool          `default:"false" split_words:"true"`
+		SQSBatchSize                 int           `envconfig:"SQS_BATCH_SIZE" default:"1"`
+		SQSEndpoint                  string        `envconfig:"SQS_ENDPOINT" required:"true"`
+		SQSQueueName                 string        `envconfig:"SQS_QUEUE_NAME" required:"true"`
+		SQSReceivers                 int           `envconfig:"SQS_RECEIVERS" default:"1"`
+		SQSReceiverWorkers           int           `envconfig:"SQS_RECEIVER_WORKERS" default:"1"`
+		StatLogTimer                 time.Duration `default:"120s" split_words:"true"`
 		WebhookEndpoint              string        `default:"http://localhost:9000" split_words:"true"`
 		WebhookTLSInsecureSkipVerify bool          `envconfig:"WEBHOOK_TLS_INSECURE_SKIP_VERIFY" default:"false"`
 		WebhookDefaultContentType    string        `default:"application/json" split_words:"true"`
@@ -29,13 +37,6 @@ type (
 		WebhookOfflineThresholdCount int           `default:"5" split_words:"true"`
 		WebhookHealthCheckInterval   time.Duration `default:"60s" split_words:"true"`
 		WebhookHealthCheckTimeout    time.Duration `default:"10s" split_words:"true"`
-		SQSEndpoint                  string        `envconfig:"SQS_ENDPOINT" required:"true"`
-		SQSQueueName                 string        `envconfig:"SQS_QUEUE_NAME" required:"true"`
-		SQSBatchSize                 int           `envconfig:"SQS_BATCH_SIZE" default:"1"`
-		SQSReceivers                 int           `envconfig:"SQS_RECEIVERS" default:"1"`
-		SQSReceiverWorkers           int           `envconfig:"SQS_RECEIVER_WORKERS" default:"1"`
-		EnableStatLog                bool          `default:"false" split_words:"true"`
-		StatLogTimer                 time.Duration `default:"120s" split_words:"true"`
 	}
 
 	// StatLogger is a utility for logging runtime statistics.
@@ -79,10 +80,15 @@ func (l *StatLogger) Run() {
 // main entry point
 func main() {
 	var envCfg Config
+	var logHandler slog.Handler
 	if err := envconfig.Process("carrier", &envCfg); err != nil {
 		panic(err)
 	}
-	logHandler := tint.NewHandler(os.Stdout, &tint.Options{Level: slog.LevelInfo})
+	if envCfg.EnableColorizedLogging {
+		logHandler = tint.NewHandler(os.Stdout, &tint.Options{Level: slog.LevelInfo})
+	} else {
+		logHandler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	}
 	log := slog.New(logHandler).With("source", "main")
 	ctx, cancel := context.WithCancel(context.Background())
 	awsCfg, err := config.LoadDefaultConfig(ctx)
