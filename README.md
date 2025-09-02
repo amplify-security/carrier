@@ -18,25 +18,23 @@ Carrier can be used locally in a Docker Compose stack. For example, with a worke
 at `/webhook` and runs on port `9000`:
 
 ```yml
-version: "3.3"
-
 services:
-    sqs:
-        image: roribio/alpine-sqs
-    carrier:
-        image: amplifysecurity/carrier
-        restart: unless-stopped
-        volumes:
-            - ${HOME}/.aws/credentials:/.aws/credentials
-        links:
-            - sqs:sqs
-            - worker:worker
-        environment:
-            CARRIER_WEBHOOK_ENDPOINT: http://worker:9000/webhook
-            CARRIER_SQS_ENDPOINT: http://sqs:9324
-            CARRIER_SQS_QUEUE_NAME: default
+  sqs:
+    image: roribio/alpine-sqs
+  carrier:
+    image: amplifysecurity/carrier
+    restart: unless-stopped
+    volumes:
+      - ${HOME}/.aws/credentials:/.aws/credentials
+    links:
+      - sqs:sqs
+      - worker:worker
+    environment:
+      CARRIER_WEBHOOK_ENDPOINT: http://worker:9000/webhook
+      CARRIER_SQS_ENDPOINT: http://sqs:9324
+      CARRIER_SQS_QUEUE_NAME: default
     worker:
-        build: .
+      build: .
 ```
 
 > **Note**: This example still requires AWS credentials to be mounted even though they are not used or the AWS SDK will panic.
@@ -53,35 +51,35 @@ queue `carrier-demo` in `us-west-2` for a worker that expects webhooks at `/webh
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-    name: carrier-demo
-    namespace: demo
+  name: carrier-demo
+  namespace: demo
 spec:
-    replicas: 1
-    selector:
-        matchLabels:
-            app: carrier-demo
-    template:
-        metadata:
-            labels:
-                app: carrier-demo
-        spec:
-            serviceAccountName: carrier-demo
-            containers:
-                - name: carrier
-                  image: amplifysecurity/carrier
-                  securityContext:
-                      runAsUser: 1000
-                      allowPrivilegeEscalation: false
-                      runAsNonRoot: true
-                  env:
-                      - name: CARRIER_WEBHOOK_ENDPOINT
-                        value: http://localhost:9000/webhook
-                      - name: CARRIER_SQS_ENDPOINT
-                        value: https://sqs.us-west-2.amazonaws.com
-                      - name: CARRIER_SQS_QUEUE_NAME
-                        value: carrier-demo
-                - name: worker
-                  image: ${registry}/${container}:${tag}
+  replicas: 1
+  selector:
+    matchLabels:
+      app: carrier-demo
+  template:
+    metadata:
+      labels:
+        app: carrier-demo
+    spec:
+      serviceAccountName: carrier-demo
+      containers:
+        - name: carrier
+          image: amplifysecurity/carrier
+          securityContext:
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+          env:
+            - name: CARRIER_WEBHOOK_ENDPOINT
+              value: http://localhost:9000/webhook
+            - name: CARRIER_SQS_ENDPOINT
+              value: https://sqs.us-west-2.amazonaws.com
+            - name: CARRIER_SQS_QUEUE_NAME
+              value: carrier-demo
+            - name: worker
+              image: ${registry}/${container}:${tag}
 ```
 
 > **Note**: This example assumes that the Kubernetes service account `carrier-demo` is mapped to an IAM role that has the appropriate permissions to access the `carrier-demo` SQS queue.
