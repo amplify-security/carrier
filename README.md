@@ -33,8 +33,8 @@ services:
       CARRIER_WEBHOOK_ENDPOINT: http://worker:9000/webhook
       CARRIER_SQS_ENDPOINT: http://sqs:9324
       CARRIER_SQS_QUEUE_NAME: default
-    worker:
-      build: .
+  worker:
+    build: .
 ```
 
 > **Note**: This example still requires AWS credentials to be mounted even though they are not used or the AWS SDK will panic.
@@ -78,8 +78,8 @@ spec:
               value: https://sqs.us-west-2.amazonaws.com
             - name: CARRIER_SQS_QUEUE_NAME
               value: carrier-demo
-            - name: worker
-              image: ${registry}/${container}:${tag}
+        - name: worker
+          image: ${registry}/${container}:${tag}
 ```
 
 > **Note**: This example assumes that the Kubernetes service account `carrier-demo` is mapped to an IAM role that has the appropriate permissions to access the `carrier-demo` SQS queue.
