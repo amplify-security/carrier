@@ -15,7 +15,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     permissions:
-        contents: write
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,6 +51,7 @@ jobs:
           tags: |
             type=sha
             type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
       - name: Setup QEMU
         uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3.0.0
       - name: Setup Docker Buildx
@@ -69,3 +70,5 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags}}
           labels: ${{ steps.meta.outputs.labels }}
+          sbom: true
+          provenance: true

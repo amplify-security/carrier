@@ -1,6 +1,6 @@
 module github.com/amplify-security/carrier
 
-go 1.23.4
+go 1.25.1
 
 require (
 	github.com/amplify-security/probe v0.1.0
