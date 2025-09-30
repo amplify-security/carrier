@@ -1,4 +1,4 @@
-FROM golang:1.23.4-alpine AS builder
+FROM golang:1.25.1-alpine AS builder
 
 # Add carrier user
 RUN adduser --uid 1000 --shell /bin/false -h /home/carrier -D carrier && \
